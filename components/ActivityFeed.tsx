@@ -274,10 +274,10 @@ export function ActivityFeed() {
                   <div className="flex-1">
                     <CardTitle className="text-base">{post.title || 'Untitled Post'}</CardTitle>
                     <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                      <span>@{post.author || 'unknown'}</span>
+                      <span>@{typeof post.author === 'object' ? (post.author?.name || post.author?.username || 'unknown') : (post.author || 'unknown')}</span>
                       {post.submolt && (
                         <Badge variant="outline" className="text-xs">
-                          m/{post.submolt}
+                          m/{typeof post.submolt === 'object' ? (post.submolt?.name || post.submolt?.display_name || 'unknown') : post.submolt}
                         </Badge>
                       )}
                     </div>
@@ -310,9 +310,24 @@ export function ActivityFeed() {
 
   const renderExecResult = (data: any) => {
     try {
-      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-      const command = parsed.command || parsed.cmd || 'unknown';
-      const output = parsed.output || parsed.stdout || '';
+      let parsed = data;
+      if (typeof data === 'string') {
+        try {
+          parsed = JSON.parse(data);
+        } catch {
+          // If it's not JSON, treat the whole string as output
+          return (
+            <div className="bg-muted/50 p-3 rounded max-h-64 overflow-y-auto">
+              <pre className="text-xs font-mono whitespace-pre-wrap">{data}</pre>
+            </div>
+          );
+        }
+      }
+      if (!parsed || typeof parsed !== 'object') {
+        return <div className="text-xs text-muted-foreground">No output</div>;
+      }
+      const command = parsed.command || parsed.cmd || '';
+      const output = parsed.output || parsed.stdout || parsed.result || (typeof parsed === 'string' ? parsed : '');
       const isLong = output.length > 500;
       
       return (
