@@ -257,54 +257,116 @@ export function ActivityFeed() {
   };
 
   // Tool-specific result renderers
-  const renderMoltbookResult = (data: any) => {
+  const renderMoltbookResult = (data: any, rawData: string) => {
+    const [showRaw, setShowRaw] = React.useState(false);
+    
     try {
       // Parse if string
       const parsed = typeof data === 'string' ? JSON.parse(data) : data;
       
-      // Handle array of posts or single post
-      const posts = Array.isArray(parsed) ? parsed : [parsed];
+      // Handle various data structures - look for posts in common locations
+      let posts: any[] = [];
+      if (Array.isArray(parsed)) {
+        posts = parsed;
+      } else if (parsed?.posts) {
+        posts = parsed.posts;
+      } else if (parsed?.data?.posts) {
+        posts = parsed.data.posts;
+      } else if (parsed?.results) {
+        posts = parsed.results;
+      } else if (parsed?.post) {
+        posts = [parsed.post];
+      } else {
+        posts = [parsed];
+      }
+      
+      // Helper to extract title from various structures
+      const getTitle = (post: any) => {
+        return post?.title || post?.question || post?.name || post?.headline || null;
+      };
+      
+      const getAuthor = (post: any) => {
+        const author = post?.author;
+        if (!author) return 'unknown';
+        if (typeof author === 'string') return author;
+        return author?.name || author?.username || author?.handle || 'unknown';
+      };
+      
+      const getSubmolt = (post: any) => {
+        const submolt = post?.submolt;
+        if (!submolt) return null;
+        if (typeof submolt === 'string') return submolt;
+        return submolt?.name || submolt?.display_name || null;
+      };
       
       return (
         <div className="space-y-3">
-          {posts.map((post: any, idx: number) => (
-            <Card key={idx} className="bg-muted/30 border-purple-200 dark:border-purple-800">
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <CardTitle className="text-base">{post.title || 'Untitled Post'}</CardTitle>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                      <span>@{typeof post.author === 'object' ? (post.author?.name || post.author?.username || 'unknown') : (post.author || 'unknown')}</span>
-                      {post.submolt && (
-                        <Badge variant="outline" className="text-xs">
-                          m/{typeof post.submolt === 'object' ? (post.submolt?.name || post.submolt?.display_name || 'unknown') : post.submolt}
-                        </Badge>
+          <div className="flex justify-end">
+            <button 
+              onClick={() => setShowRaw(!showRaw)}
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+            >
+              {showRaw ? 'Show Parsed' : 'Show Raw (Debug)'}
+            </button>
+          </div>
+          
+          {showRaw ? (
+            <pre className="text-xs font-mono bg-muted/50 p-3 rounded overflow-x-auto max-h-96 overflow-y-auto">
+              {rawData || JSON.stringify(parsed, null, 2)}
+            </pre>
+          ) : (
+            posts.map((post: any, idx: number) => {
+              const title = getTitle(post);
+              const author = getAuthor(post);
+              const submolt = getSubmolt(post);
+              
+              return (
+                <Card key={idx} className="bg-muted/30 border-purple-200 dark:border-purple-800">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <CardTitle className="text-base">{title || 'Untitled Post'}</CardTitle>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          <span>@{author}</span>
+                          {submolt && (
+                            <Badge variant="outline" className="text-xs">
+                              m/{submolt}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      {post.upvotes !== undefined && (
+                        <div className="flex items-center gap-1 text-sm">
+                          <ArrowUp className="w-4 h-4" />
+                          <span className="font-semibold">{post.upvotes}</span>
+                        </div>
                       )}
                     </div>
-                  </div>
-                  {post.upvotes !== undefined && (
-                    <div className="flex items-center gap-1 text-sm">
-                      <ArrowUp className="w-4 h-4" />
-                      <span className="font-semibold">{post.upvotes}</span>
-                    </div>
+                  </CardHeader>
+                  {post.content && (
+                    <CardContent className="pt-0">
+                      <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {typeof post.content === 'string' ? post.content : JSON.stringify(post.content)}
+                        </ReactMarkdown>
+                      </div>
+                    </CardContent>
                   )}
-                </div>
-              </CardHeader>
-              {post.content && (
-                <CardContent className="pt-0">
-                  <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {post.content}
-                    </ReactMarkdown>
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          ))}
+                </Card>
+              );
+            })
+          )}
         </div>
       );
     } catch (e) {
-      return <div className="text-sm text-red-500">Error parsing Moltbook data</div>;
+      return (
+        <div className="space-y-2">
+          <div className="text-sm text-red-500">Error parsing Moltbook data</div>
+          <pre className="text-xs font-mono bg-muted/50 p-3 rounded overflow-x-auto">
+            {rawData || String(data)}
+          </pre>
+        </div>
+      );
     }
   };
 
@@ -570,7 +632,7 @@ export function ActivityFeed() {
             <MessageSquare className="w-4 h-4" />
             <span className="font-semibold text-sm font-mono">{toolName}</span>
           </div>
-          {renderMoltbookResult(contentData || contentStr)}
+          {renderMoltbookResult(contentData || contentStr, contentStr)}
         </div>
       );
     }
