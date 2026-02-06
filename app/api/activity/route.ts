@@ -41,20 +41,28 @@ export async function GET(request: NextRequest) {
 
       for (const line of lines) {
         try {
-          const msg = JSON.parse(line);
+          const entry = JSON.parse(line);
+          
+          // Skip non-message entries
+          if (entry.type !== 'message') {
+            continue;
+          }
+
+          const msg = entry.message;
+          const timestamp = entry.timestamp || new Date().toISOString();
           
           // Parse different message types
           if (msg.role === 'user') {
             activities.push({
               sessionId,
-              timestamp: msg.timestamp || new Date().toISOString(),
+              timestamp,
               type: 'user',
               content: msg.content,
             });
           } else if (msg.role === 'assistant') {
             activities.push({
               sessionId,
-              timestamp: msg.timestamp || new Date().toISOString(),
+              timestamp,
               type: 'assistant',
               content: msg.content,
               tokenUsage: msg.usage,
@@ -66,7 +74,7 @@ export async function GET(request: NextRequest) {
             for (const toolCall of msg.tool_calls) {
               activities.push({
                 sessionId,
-                timestamp: msg.timestamp || new Date().toISOString(),
+                timestamp,
                 type: 'tool_call',
                 content: toolCall,
               });
@@ -77,7 +85,7 @@ export async function GET(request: NextRequest) {
           if (msg.role === 'tool') {
             activities.push({
               sessionId,
-              timestamp: msg.timestamp || new Date().toISOString(),
+              timestamp,
               type: 'tool_result',
               content: msg,
             });

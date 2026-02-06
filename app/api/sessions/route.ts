@@ -16,7 +16,12 @@ export async function GET(request: NextRequest) {
       const sessionPath = join(SESSIONS_DIR, `${sessionId}.jsonl`);
       const content = await readFile(sessionPath, 'utf-8');
       const lines = content.trim().split('\n').filter(line => line.trim());
-      const messages = lines.map(line => JSON.parse(line));
+      const entries = lines.map(line => JSON.parse(line));
+      
+      // Filter to only message entries
+      const messages = entries
+        .filter(e => e.type === 'message')
+        .map(e => ({ ...e.message, timestamp: e.timestamp, id: e.id }));
       
       return NextResponse.json({
         sessionId,
