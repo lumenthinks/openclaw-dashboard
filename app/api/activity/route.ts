@@ -60,29 +60,50 @@ export async function GET(request: NextRequest) {
               content: msg.content,
             });
           } else if (msg.role === 'assistant') {
-            activities.push({
-              sessionId,
-              timestamp,
-              type: 'assistant',
-              content: msg.content,
-              tokenUsage: msg.usage,
-            });
-          }
-
-          // Extract tool calls
-          if (msg.tool_calls) {
-            for (const toolCall of msg.tool_calls) {
+            // Check if content is an array with tool calls embedded
+            if (Array.isArray(msg.content)) {
+              // Filter out thinking blocks for the main assistant message
+              const textContent = msg.content.filter((block: any) => 
+                block.type === 'text'
+              );
+              
+              if (textContent.length > 0) {
+                activities.push({
+                  sessionId,
+                  timestamp,
+                  type: 'assistant',
+                  content: msg.content,
+                  tokenUsage: msg.usage,
+                });
+              }
+              
+              // Extract tool calls from content blocks
+              const toolCalls = msg.content.filter((block: any) => 
+                block.type === 'toolCall' || block.type === 'tool_use'
+              );
+              
+              for (const toolCall of toolCalls) {
+                activities.push({
+                  sessionId,
+                  timestamp,
+                  type: 'tool_call',
+                  content: toolCall,
+                });
+              }
+            } else {
+              // Simple string content
               activities.push({
                 sessionId,
                 timestamp,
-                type: 'tool_call',
-                content: toolCall,
+                type: 'assistant',
+                content: msg.content,
+                tokenUsage: msg.usage,
               });
             }
           }
 
           // Tool results
-          if (msg.role === 'tool') {
+          if (msg.role === 'toolResult') {
             activities.push({
               sessionId,
               timestamp,
